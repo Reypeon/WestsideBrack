@@ -22,6 +22,6 @@ export { sequelize };
 
 // PARA  CONECTARME A LA BASE DE DATOS LOCAL MANUALMENTE
 // import {Sequelize} from "sequelize";
-//  const sequelize = new Sequelize('postgres://postgres:admin@localhost:5432/ecommercedbb'); // Example 
+//  const sequelize = new Sequelize('postgres://postgres:admin@localhost:5432/WestsideDBlocal'); // Example 
 // export {sequelize}
 //No eliminar

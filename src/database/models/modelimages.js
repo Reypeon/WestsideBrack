@@ -11,16 +11,6 @@ Image.init(
       primaryKey: true,
     },
 
-    url: {
-      type: DataTypes.STRING,
-      allowNull: true, // Ahora puede estar vacío
-    },
-
-    urlZoom: {
-      type: DataTypes.STRING,
-      allowNull: true, // Puede estar vacío
-    },
-
     urlWEBP: {
       type: DataTypes.STRING,
       allowNull: true, // Puede estar vacío
