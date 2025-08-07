@@ -1,0 +1,16 @@
+# Carpetas y archivos que NO quiero subir a GitHub
+
+# Dependencias
+node_modules/
+
+# Archivos sensibles
+.env
+
+# Archivos temporales o de logs
+*.log
+logs/
+.DS_Store
+
+# Salida de compilación (si tenés)
+dist/
+build/
