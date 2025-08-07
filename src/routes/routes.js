@@ -18,7 +18,6 @@ import { ScanProductos, GetJsoNScraping, getAllScrapedProducts, deleteScrapedJSO
 import {filtrarProductosRepetidos, compararScrapingConDB,
    getProductosRepetidos} from "../controllers/hanlderMnatenimiento.js"
 
-import mercadopago from "mercadopago"
 import axios from 'axios';
 import dotenv from 'dotenv';
 import upload from './multer.js'
