@@ -65,30 +65,22 @@ export const createProduct = async (req, res) => {
     // Procesar imágenes con try-catch para no romper todo si falla una imagen
     for (const imgObj of imagesArray) {
       try {
-        let url = null;
         let urlWEBP = null;
-        let urlZoom = null;
-        let urlZoomWEBP = null;
+        let urlJPG = null;
 
         if (imgObj.imagenLocalJpeg) {
-          url = await uploadLocalFileToSupabase(imgObj.imagenLocalJpeg, 'images', 'image/jpg');
+          urlJPG = await uploadLocalFileToSupabase(imgObj.imagenLocalJpeg, 'images', 'image/jpeg');
         }
+       
         if (imgObj.imagenLocalWebp) {
           urlWEBP = await uploadLocalFileToSupabase(imgObj.imagenLocalWebp, 'imagesWEBP', 'image/webp');
         }
-        if (imgObj.imagenZoomLocal) {
-          urlZoom = await uploadLocalFileToSupabase(imgObj.imagenZoomLocal, 'images', 'image/jpg');
-        }
-        if (imgObj.imagenZoomLocalWebp) {
-          urlZoomWEBP = await uploadLocalFileToSupabase(imgObj.imagenZoomLocalWebp, 'imagesWEBP', 'image/webp');
-        }
+       
 
         uploadedImagesData.push({
-          url,
           urlWEBP,
-          urlZoom,
-          urlZoomWEBP,
-          alt: imgObj.alt || '',
+          urlJPG,
+          alt: imgObj.alt && imgObj.alt.trim() !== '' ? imgObj.alt : model,
         });
       } catch (imgErr) {
         console.log(`No se pudo subir una imagen: ${imgErr.message}`);

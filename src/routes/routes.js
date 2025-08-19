@@ -10,7 +10,7 @@ import { deleteImageById } from '../controllers/handlerImages.js';
 
 import { orderLimiter, validateOrder, handlerOrdenes, getOrders, deleteOrden } from '../controllers/handlerOrdenes.js';
 
-import { uploadMedia, deleteFileFromStorage } from "../controllers/mediaController.js"
+import { uploadMedia, getGlbFiles , deleteFileFromStorage } from "../controllers/mediaController.js"
 
 import { ScanProductos, GetJsoNScraping, getAllScrapedProducts, deleteScrapedJSON, 
   deleteAllScrapedJSON,vaciarCarpetaImages, } from "../controllers/handlerScanP.js"
@@ -58,8 +58,10 @@ router.post('/ordenar', ordenProducts);
 //RUTAS SERVIR IMAGENES DEL DISEÑO DE LA APPWEB
 router.delete('/delete-image/:idImage', deleteImageById);
 
-//RUTa video
+//RUTa video y 3d
 router.post('/uploadMedia', upload, uploadMedia);
+router.get('/glbs', getGlbFiles);
+
 //RUTA PARA LAS ORDENES
 router.post('/ordenes',orderLimiter, validateOrder, handlerOrdenes);
 router.get('/ordenesGet', getOrders);

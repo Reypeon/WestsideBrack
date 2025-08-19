@@ -49,6 +49,30 @@ export const uploadMedia = async (req, res) => {
     res.status(500).json({ error: 'Error al subir archivos' });
   }
 };
+export const getGlbFiles = async (req, res) => {
+  try {
+    const { data, error } = await supabase.storage.from('glb').list('', {
+      limit: 100,
+      offset: 0,
+      sortBy: { column: 'name', order: 'asc' },
+    });
+
+    if (error) throw error;
+
+    // Filtrar solo archivos con extensión .glb (opcional)
+    const files = data
+      .filter(file => file.name.toLowerCase().endsWith('.glb'))
+      .map(file => ({
+        id: file.id || file.name,
+        url: `${process.env.SUPABASE_URL}/storage/v1/object/public/glb/${file.name}`,
+      }));
+
+    res.json({ files });
+  } catch (error) {
+    console.error('Error listando archivos glb:', error);
+    res.status(500).json({ error: 'Error listando archivos glb' });
+  }
+};
 
 
 export const deleteFileFromStorage = async (req, res) => {

@@ -16,13 +16,14 @@ Image.init(
       allowNull: true, // Puede estar vacío
     },
 
-    urlZoomWEBP: {
+    urlJPG: {
       type: DataTypes.STRING,
       allowNull: true, // Puede estar vacío
     },
     alt: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
+      defaultValue: '',  // 👈 evita error si no mandás alt
       validate: {
         notEmpty: true,
         len: [3, 5000],
