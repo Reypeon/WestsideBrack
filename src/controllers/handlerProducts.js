@@ -83,16 +83,6 @@ export const createProduct = async (req, res) => {
     // Normalizar para que siempre usemos un solo array
     const finalImagesArray = imagesArray || images;
 
-    console.log({
-      model,
-      modelUser,
-      description,
-      price,
-      stock,
-      categoryIds,
-      finalImagesArray,
-    });
-
     // Validaciones básicas
     if (!model || !price || !stock) {
       return res
@@ -167,11 +157,11 @@ export const createProduct = async (req, res) => {
     // Procesar imágenes
     for (const imgObj of finalImagesArray) {
       try {
-        let url = null;
+        let urlJPG = null;
         let urlWEBP = null;
 
         if (imgObj.imagenLocalJpeg) {
-          url = await uploadLocalFileToSupabase(
+          urlJPG = await uploadLocalFileToSupabase(
             imgObj.imagenLocalJpeg,
             "images",
             "image/jpeg"
@@ -186,7 +176,7 @@ export const createProduct = async (req, res) => {
         }
 
         uploadedImagesData.push({
-          url,
+          urlJPG,
           urlWEBP,
           alt: imgObj.alt || "",
         });
@@ -325,7 +315,7 @@ export const updateProduct = async (req, res) => {
         if (!image) continue;
 
         // Eliminar imágenes de supabase si algún campo debe eliminarse
-        for (const field of ['url', 'urlWEBP', 'urlZoom', 'urlZoomWEBP']) {
+        for (const field of ['urlJPG', 'urlWEBP', 'urlZoom', 'urlZoomWEBP']) {
           if (updatesObj[field] === null && image[field]) {
             await supabase.storage.from(bucket).remove([image[field]]);
             image[field] = null;
@@ -357,7 +347,6 @@ export const updateProduct = async (req, res) => {
     res.status(500).json({ error: 'Error al actualizar el producto.' });
   }
 };
-
 //ELIMINAR PRODUCTOS
 export const deleteProduct = async (req, res) => {
   // Soporta eliminar por params (uno) o por body (varios)
@@ -425,8 +414,7 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
-
-//RUTA GET "all-products"
+// BUSCAR TODOS LOS PRODUCTOS
 export const getAllProducts = async (req, res) => {
   try {
     const products = await Product.findAll({
@@ -434,16 +422,43 @@ export const getAllProducts = async (req, res) => {
         { model: Category, as: "categories" },
         { model: Image, as: "images" },
       ],
-
     });
-    res.status(200).json(products);
+
+    const productsWithUrls = products.map((product) => {
+      const imagesWithUrls = product.images.map((img) => {
+        let publicUrlWEBP = img.urlWEBP ? supabase
+          .storage
+          .from('media') // tu bucket
+          .getPublicUrl(img.urlWEBP).data.publicUrl
+          : null;
+
+        let publicUrlJPG = img.urlJPG ? supabase
+          .storage
+          .from('media')
+          .getPublicUrl(img.urlJPG).data.publicUrl
+          : null;
+
+        return {
+          ...img.toJSON(),
+          urlWEBP: publicUrlWEBP,
+          urlJPG: publicUrlJPG,
+        };
+      });
+
+      return {
+        ...product.toJSON(),
+        images: imagesWithUrls,
+      };
+    });
+
+    res.status(200).json(productsWithUrls);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error al obtener todos los productos:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 };
 
-
-//RUTA GET "getProductsByCategory" busca productos por categorias con sus respectivas iamgenes asociadas
+// BUSCAR TODOS LOS PRODUCTOS DE CATEGORIA ID
 export const getProductsByCategory = async (req, res) => {
   try {
     const categoryIds = req.query.categoryIds
@@ -453,34 +468,73 @@ export const getProductsByCategory = async (req, res) => {
     if (categoryIds.length === 0) {
       return res.status(400).json({ error: "Debe enviar categoryIds" });
     }
-const products = await Product.findAll({
-  include: [
-    {
-      model: Category,
-      as: "categories",
-      where: { id: categoryIds },
-      required: true,
-      through: {
-        attributes: ["orden"],  // Traigo el campo orden de la tabla intermedia
-      },
-    },
-    {
-      model: Image,
-      as: "images",
-    },
-  ],
-  order: [
-    // Ordenar por el campo "orden" de la tabla intermedia ProductCategory
-    [{ model: Category, as: "categories" }, ProductCategory, "orden", "ASC"],
-  ],
-});
-    res.json(products);
+
+    const products = await Product.findAll({
+      include: [
+        {
+          model: Category,
+          as: "categories",
+          where: { id: categoryIds },
+          required: true,
+          through: {
+            attributes: ["orden"],
+          },
+        },
+        {
+          model: Image,
+          as: "images",
+        },
+      ],
+      order: [
+        [{ model: Category, as: "categories" }, ProductCategory, "orden", "ASC"],
+      ],
+    });
+
+    // Construir URLs públicas para las imágenes
+    const productsWithUrls = await Promise.all(
+      products.map(async (product) => {
+        const imagesWithUrls = await Promise.all(
+          product.images.map(async (img) => {
+            let publicUrlWEBP = null;
+            let publicUrlJPG = null;
+
+            if (img.urlWEBP) {
+              const { data, error } = supabase
+                .storage
+                .from('media') // tu bucket en Supabase
+                .getPublicUrl(img.urlWEBP);
+              publicUrlWEBP = data.publicUrl;
+            }
+
+            if (img.urlJPG) {
+              const { data, error } = supabase
+                .storage
+                .from('media') // tu bucket
+                .getPublicUrl(img.urlJPG);
+              publicUrlJPG = data.publicUrl;
+            }
+
+            return {
+              ...img.toJSON(),
+              urlWEBP: publicUrlWEBP,
+              urlJPG: publicUrlJPG,
+            };
+          })
+        );
+
+        return {
+          ...product.toJSON(),
+          images: imagesWithUrls,
+        };
+      })
+    );
+
+    res.json(productsWithUrls);
   } catch (error) {
     console.error("Error al obtener productos por categoría:", error);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };
-
 
 
 //RUTA GET ""/products/detail/:id"" LA USO en detail para buscar un solo producto
