@@ -537,6 +537,12 @@ export const getProductsByCategory = async (req, res) => {
 };
 
 
+
+
+
+
+
+
 //RUTA GET ""/products/detail/:id"" LA USO en detail para buscar un solo producto
 export const searchId = async (req, res) => {
   try {
