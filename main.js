@@ -15,7 +15,7 @@ async function main() {
 
     // 2. Sincronizar modelos con la base de datos (crea tablas si no existen)
     // force: false -> NO borra las tablas, solo crea las que faltan
-    await sequelize.sync({ alter: false });
+    await sequelize.sync({ alter: true });
 
     // 3. Levantar el servidor para escuchar conexiones
     app.listen(PORT,() => {
