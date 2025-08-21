@@ -2,8 +2,8 @@ import { Router }from 'express';
 //HANDLERS
 import { createCategory, getAllCategories, deleteCategory } from "../controllers/handlerCategory.js"
 
-import {searchId, createProduct, updateProduct, getAllProducts,
-   getProductsByCategory, deleteProduct, productRetidos, ordenProducts,
+import {searchId, GuardarIMGSpublic, createProduct, updateProduct, getAllProducts,
+   getProductsByCategory, deleteProduct, ordenProducts,
    updatePricesByIds, removeProductsFromCategory} from '../controllers/handlerProducts.js'
 
 import { deleteImageById } from '../controllers/handlerImages.js';
@@ -12,11 +12,8 @@ import { orderLimiter, validateOrder, handlerOrdenes, getOrders, deleteOrden } f
 
 import { uploadMedia, getGlbFiles , deleteFileFromStorage } from "../controllers/mediaController.js"
 
-import { ScanProductos, GetJsoNScraping, getAllScrapedProducts, deleteScrapedJSON, 
-  deleteAllScrapedJSON,vaciarCarpetaImages, } from "../controllers/handlerScanP.js"
+import {  deleteScrapedJSON, deleteAllScrapedJSON, vaciarCarpetaImages, } from "../controllers/handlerScanP.js"
 
-import {filtrarProductosRepetidos, compararScrapingConDB,
-   getProductosRepetidos} from "../controllers/hanlderMnatenimiento.js"
 
 import axios from 'axios';
 import dotenv from 'dotenv';
@@ -45,14 +42,29 @@ router.get('/all-products', getAllProducts);
 router.get('/products/detail/:id', searchId);
 router.get('/productos', getProductsByCategory); // busca por categoria categoryIds 
 //ADMIN PRODUCTOS
-router.get('/productos-repetidos', productRetidos), //busca por model reped
+
+//subir imagenes y pasarlas a webp y jpeg apr aguardarlas en public
+router.post('/GuardarIMGSpublic', (req, res, next) => {
+  upload(req, res, function(err) {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  });
+}, GuardarIMGSpublic);
+//crear producto/s
 router.post('/createProduct', upload ,createProduct)
+//Actualizar productos
 router.put('/updateProduct/:id', upload, updateProduct) 
+//Ordenar Productos
+router.post('/ordenar', ordenProducts);
+//Cambiar precios de productos por id
+router.put('/updatePricesByIds', updatePricesByIds )
+
+
 router.delete('/dellProduct/:id', deleteProduct); // eliminar uno
 router.delete('/dellProduct', deleteProduct);// eliminar muchos 
 router.delete('/category/removeProducts', removeProductsFromCategory);// eliminar asocian de un producto de su categoria sin eliminar img
-router.put('/updatePricesByIds', updatePricesByIds )
-router.post('/ordenar', ordenProducts);
 //FIN ADMIN PRODUCTOS
 
 //RUTAS SERVIR IMAGENES DEL DISEÑO DE LA APPWEB
@@ -68,14 +80,10 @@ router.get('/ordenesGet', getOrders);
 router.delete('/deleteOrden/:id', deleteOrden)
 
 
-
-//ADMIN
-
 // para que no se apague el servidor version fre
 router.get('/ping', (req, res) => {
   res.status(200).send("pong");
 });
-
 // para crear iconos
 router.post('/convert-images-to-webp', upload, async (req, res) => {
   try {
@@ -94,10 +102,9 @@ router.post('/convert-images-to-webp', upload, async (req, res) => {
     }
 
  await sharp(imageFile.buffer)
-.resize({ width:130, height: 80, fit: 'inside' })
+  .resize({ width:90, height: 90, fit: 'inside' })
   .webp({ quality: 60 })
   .toFile(outputPath);
-
     return res.json({
       message: 'Imagen convertida y redimensionada correctamente',
       path: `/converted/${fileName}`,
@@ -109,24 +116,10 @@ router.post('/convert-images-to-webp', upload, async (req, res) => {
   }
 });
 
-
-
-//Mantenimiento:
-//Scraper // mantener eliminadas o comentadas djes de trabajr en produccion
-router.post('/ScanProductos', ScanProductos); // pasarle url para scraping
-
-router.get('/GetJsoNScraping/:nombre', GetJsoNScraping);// get por nombre del json scraping
-router.get('/GetAllJsoNScraping', getAllScrapedProducts);// get todos los json scraping
-
 router.delete('/DELscraping/:nombre', deleteScrapedJSON);     // Elimina uno
 router.delete('/DELscraping', deleteAllScrapedJSON);          // Elimina todos
 router.delete('/VaciarPublicImage', vaciarCarpetaImages); //vaciar la carpeta public/images
 
-//para cuando haga scraping fijarme dentro de los json si hay productos repetidos
-router.get('/filtrarRepetidos', filtrarProductosRepetidos); // productos repetidos de los json de data/scraping.json 
-router.get("/getProductosRepetidos", getProductosRepetidos); // muestra los productos repetidos quecrea la ruta /filtrarRepetidos
-router.get('/compararScrapingConDB', compararScrapingConDB); // compara productos de los scarping con los del sistema
-//Mantenimiento.
 
 
 

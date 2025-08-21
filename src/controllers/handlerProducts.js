@@ -4,122 +4,232 @@ import Image from "../database/models/modelimages.js"
 import supabase from '../database/models/supa/supabase.js'; // tu cliente supabase ya configurado
 import ProductCategory from '../database/models/ProductCategory.js'
 import path from 'path';
-import fs from 'fs/promises';
+import fs from 'fs';
+import { readFile } from "fs/promises";
+import sharp from "sharp";
+// Rutas de salida
+const imagesJpegDir = path.join(process.cwd(),"src", "public/imagesJpeg");
+const imagesWebpDir = path.join(process.cwd(),"src", "public/imagesWEBP");
+if (!fs.existsSync(imagesJpegDir)) fs.mkdirSync(imagesJpegDir, { recursive: true });
+if (!fs.existsSync(imagesWebpDir)) fs.mkdirSync(imagesWebpDir, { recursive: true });
 
-//CREAR un nuevo prooducto/s, Recorda que las imagenes las usa de public/images
-export const createProduct = async (req, res) => {
+// Función para nombres válidos
+const slugify = (str) =>
+  str
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+//PASO 1 PARA CREAR PRODUCTOS
+export const GuardarIMGSpublic = async (req, res) => {
   try {
-    let { model, modelUser, description, price, stock, categoryIds, images: imagesArray } = req.body;
-    
+    // Validar que llegaron imágenes
+    if (!req.files || !req.files.images || req.files.images.length === 0) {
+      return res.status(400).json({ error: "No se recibieron imágenes" });
+    }
+
+    const rutas = [];
+
+    for (const file of req.files.images) {
+      const nombreBase = slugify(path.parse(file.originalname).name);
+      const filenameJpeg = `${nombreBase}.jpeg`;
+      const filenameWebp = `${nombreBase}.webp`;
+
+      const outputJpeg = path.join(imagesJpegDir, filenameJpeg);
+      const outputWebp = path.join(imagesWebpDir, filenameWebp);
+
+      // Procesar con Sharp
+      await sharp(file.buffer)
+        .resize(500, 500, { fit: "cover" })
+        .toFormat("jpeg", { quality: 80 })
+        .toFile(outputJpeg);
+
+      await sharp(file.buffer)
+        .resize(500, 500, { fit: "cover" })
+        .toFormat("webp", { quality: 80 })
+        .toFile(outputWebp);
+
+      rutas.push({
+        jpeg: `/imagesJpeg/${filenameJpeg}`,
+        webp: `/imagesWEBP/${filenameWebp}`,
+      });
+    }
+
+    return res.json(rutas);
+  } catch (error) {
+    console.error("Error procesando imágenes:", error.message);
+    return res.status(500).json({ error: "Error al procesar imágenes" });
+  }
+};
+
+
+//PASO 2 PARA CREAR PRODUCTOS
+
+export const createProduct = async (req, res) => {
+  
+  try {
+    let {
+      model,
+      modelUser,
+      description,
+      price,
+      stock,
+      categoryIds,
+      images,
+      imagesArray,
+    } = req.body;
+
+    // Normalizar para que siempre usemos un solo array
+    const finalImagesArray = imagesArray || images;
+
+    console.log({
+      model,
+      modelUser,
+      description,
+      price,
+      stock,
+      categoryIds,
+      finalImagesArray,
+    });
+
     // Validaciones básicas
     if (!model || !price || !stock) {
-      return res.status(400).json({ error: 'Faltan datos obligatorios: model, price o stock' });
+      return res
+        .status(400)
+        .json({ error: "Faltan datos obligatorios: model, price o stock" });
     }
     if (!categoryIds) {
-      return res.status(400).json({ error: 'Faltan las categorías (categoryIds)' });
+      return res
+        .status(400)
+        .json({ error: "Faltan las categorías (categoryIds)" });
     }
-    if (!imagesArray || !Array.isArray(imagesArray) || imagesArray.length === 0) {
-      return res.status(400).json({ error: 'Faltan imágenes para el producto' });
+    if (
+      !finalImagesArray ||
+      !Array.isArray(finalImagesArray) ||
+      finalImagesArray.length === 0
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Faltan imágenes para el producto" });
     }
-    // Parsear categoryIds si viene como string JSON
-    if (typeof categoryIds === 'string') {
+
+    // Parsear categoryIds si viene como string
+    if (typeof categoryIds === "string") {
       try {
         categoryIds = JSON.parse(categoryIds);
       } catch {
-        return res.status(400).json({ error: 'categoryIds no es un array válido' });
+        return res
+          .status(400)
+          .json({ error: "categoryIds no es un array válido" });
       }
     }
     if (!Array.isArray(categoryIds)) {
-      return res.status(400).json({ error: 'categoryIds debe ser un array' });
+      return res
+        .status(400)
+        .json({ error: "categoryIds debe ser un array" });
     }
 
-    // // Validar que existan las categorías en la BD antes de seguir no
-    // NOVALIDO PORQUE USO LOS ID DEL SISTEMA Y ESTE HANLDER EN EL LOCALHOST DONDE ESTAN
-    // const foundCategories = await Category.findAll({ where: { id: categoryIds } });
-    // if (foundCategories.length !== categoryIds.length) {
-    //   return res.status(400).json({ error: 'Algunas categorías no existen en la base de datos' });
-    // }
-
-    const bucket = 'media';
+    const bucket = "media";
     const uploadedImagesData = [];
-    const baseImagePath = path.join(process.cwd(), 'src', 'public');
+    const baseImagePath = path.join(process.cwd(), "src", "public");
 
-    const uploadLocalFileToSupabase = async (relativePath, folderSupabase, contentType) => {
+    // Helper para subir archivo local a supabase
+    const uploadLocalFileToSupabase = async (
+      relativePath,
+      folderSupabase,
+      contentType
+    ) => {
       try {
-        const fullLocalPath = path.join(baseImagePath, relativePath.replace(/^\//, ''));
-        const fileBuffer = await fs.readFile(fullLocalPath);
+        const fullLocalPath = path.join(
+          baseImagePath,
+          relativePath.replace(/^\//, "")
+        );
+        const fileBuffer = await readFile(fullLocalPath);
         const fileName = path.basename(relativePath);
         const supabasePath = `${folderSupabase}/${Date.now()}-${fileName}`;
 
-        const { error } = await supabase.storage.from(bucket).upload(supabasePath, fileBuffer, {
-          contentType,
-          upsert: true,
-        });
+        const { error } = await supabase.storage
+          .from(bucket)
+          .upload(supabasePath, fileBuffer, {
+            contentType,
+            upsert: true,
+          });
         if (error) throw error;
         return supabasePath;
       } catch (err) {
-        throw new Error(`Error subiendo archivo ${relativePath}: ${err.message}`);
+        throw new Error(
+          `Error subiendo archivo ${relativePath}: ${err.message}`
+        );
       }
     };
 
-    // Procesar imágenes con try-catch para no romper todo si falla una imagen
-    for (const imgObj of imagesArray) {
+    // Procesar imágenes
+    for (const imgObj of finalImagesArray) {
       try {
+        let url = null;
         let urlWEBP = null;
-        let urlJPG = null;
 
         if (imgObj.imagenLocalJpeg) {
-          urlJPG = await uploadLocalFileToSupabase(imgObj.imagenLocalJpeg, 'images', 'image/jpeg');
+          url = await uploadLocalFileToSupabase(
+            imgObj.imagenLocalJpeg,
+            "images",
+            "image/jpeg"
+          );
         }
-       
         if (imgObj.imagenLocalWebp) {
-          urlWEBP = await uploadLocalFileToSupabase(imgObj.imagenLocalWebp, 'imagesWEBP', 'image/webp');
+          urlWEBP = await uploadLocalFileToSupabase(
+            imgObj.imagenLocalWebp,
+            "imagesWEBP",
+            "image/webp"
+          );
         }
-       
 
         uploadedImagesData.push({
+          url,
           urlWEBP,
-          urlJPG,
-          alt: imgObj.alt && imgObj.alt.trim() !== '' ? imgObj.alt : model,
+          alt: imgObj.alt || "",
         });
       } catch (imgErr) {
         console.log(`No se pudo subir una imagen: ${imgErr.message}`);
-        // Opcional: podés decidir si abortar toda la creación o continuar sin esa imagen
       }
     }
+
     // Crear producto en BD
     const product = await Product.create({
       model,
-      modelUser: modelUser || '',
-      description: description || '',
+      modelUser: modelUser || "",
+      description: description || "",
       price,
       stock,
     });
 
-    // Asociar categorías en tabla intermedia
+    // Asociar categorías
     await product.addCategories(categoryIds);
 
-    // Crear las imágenes en BD vinculadas al producto
+    // Crear imágenes en BD vinculadas
     for (const imgData of uploadedImagesData) {
       await Image.create({ ...imgData, productId: product.id });
     }
 
-    // Consultar producto con relaciones para devolver
+    // Consultar producto con relaciones
     const fullProduct = await Product.findOne({
       where: { id: product.id },
       include: [
-        { model: Category, as: 'categories' },
-        { model: Image, as: 'images' },
+        { model: Category, as: "categories" },
+        { model: Image, as: "images" },
       ],
     });
 
     return res.status(201).json(fullProduct);
   } catch (error) {
-    console.error('Error crear producto:', error);
-    return res.status(500).json({ error: error.message || 'Error al crear el producto.' });
+    console.error("Error crear producto:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Error al crear el producto." });
   }
 };
-
+//ACTUALIZAR PRODCUTOS
 export const updateProduct = async (req, res) => {
   const { id } = req.params;
   const {
@@ -248,7 +358,7 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-
+//ELIMINAR PRODUCTOS
 export const deleteProduct = async (req, res) => {
   // Soporta eliminar por params (uno) o por body (varios)
   const singleId = req.params.id;
@@ -332,8 +442,8 @@ export const getAllProducts = async (req, res) => {
   }
 };
 
-// RUTA GET "getProductsByCategory" busca productos por categorias con sus respectivas iamgenes asociadas
 
+//RUTA GET "getProductsByCategory" busca productos por categorias con sus respectivas iamgenes asociadas
 export const getProductsByCategory = async (req, res) => {
   try {
     const categoryIds = req.query.categoryIds
@@ -400,9 +510,8 @@ export const searchId = async (req, res) => {
 
 
 
-
-//Productos Repetidso
-export const productRetidos = async (req, res) => {
+//Productos Repetidos
+export const productRepetidos = async (req, res) => {
   try {
     const productos = await Product.findAll({
       include: ['categories', 'images'],
@@ -430,16 +539,6 @@ export const productRetidos = async (req, res) => {
     res.status(500).json({ error: "Error al procesar la solicitud" });
   }
 };
-
-
-
-
-
-
-
-
-
-
 
 
 export const getProductById = async (req, res) => {

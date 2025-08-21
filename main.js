@@ -18,7 +18,7 @@ async function main() {
     await sequelize.sync({ alter: false });
 
     // 3. Levantar el servidor para escuchar conexiones
-    app.listen(PORT, "0.0.0.0", () => {
+    app.listen(PORT,() => {
       console.log(`Servidor escuchando en puerto ${PORT}`);
     });
 
